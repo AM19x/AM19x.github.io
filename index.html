@@ -165,21 +165,14 @@
                 results.style.display = 'none';
 
                 try {
-                    // First try VirusTotal (if you have API key)
-                    // const vtResult = await checkVirusTotal(url);
-                    // if (vtResult) {
-                    //     showResult(vtResult);
-                    //     return;
-                    // }
-
-                    // Fallback to PhishTank (no API key needed)
+                    // First try PhishTank
                     const ptResult = await checkPhishTank(url);
                     showResult(ptResult);
                 } catch (error) {
                     showResult({
                         isScam: false,
-                        message: "Could not verify website",
-                        details: "Our safety check services are currently unavailable. Please try again later."
+                        message: "⚠️ Verification Failed",
+                        details: "Service temporarily unavailable. Try again later."
                     });
                 } finally {
                     checkBtn.disabled = false;
@@ -189,13 +182,24 @@
 
             async function checkPhishTank(url) {
                 try {
-                    const response = await fetch(`https://checkurl.phishtank.com/checkurl/?url=${encodeURIComponent(url)}`);
+                    // Extract domain only (remove protocol and paths)
+                    const domain = url.replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0];
+                    
+                    // PhishTank requires POST request with form data
+                    const response = await fetch('https://checkurl.phishtank.com/checkurl/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: `url=${encodeURIComponent(domain)}&format=json`
+                    });
+                    
                     const data = await response.json();
                     
-                    if (data.results.in_database) {
+                    if (data.results && data.results.in_database) {
                         return {
                             isScam: true,
-                            message: "❌ Potential Scam Detected",
+                            message: "❌ Confirmed Scam",
                             details: "This website is listed in PhishTank's database of known phishing sites."
                         };
                     }
@@ -209,47 +213,6 @@
                     throw error;
                 }
             }
-
-            // Uncomment if you get a VirusTotal API key
-            /*
-            async function checkVirusTotal(url) {
-                const domain = extractDomain(url);
-                if (!domain) return null;
-                
-                try {
-                    const response = await fetch(`https://www.virustotal.com/api/v3/domains/${domain}`, {
-                        headers: { "x-apikey": "YOUR_VIRUSTOTAL_KEY" }
-                    });
-                    const data = await response.json();
-                    
-                    const stats = data.data.attributes.last_analysis_stats;
-                    if (stats.malicious > 0) {
-                        return {
-                            isScam: true,
-                            message: "❌ Malicious Website",
-                            details: `${stats.malicious} security vendors flagged this domain as malicious.`
-                        };
-                    }
-                    return {
-                        isScam: false,
-                        message: "✅ Verified Safe",
-                        details: "No security vendors flagged this domain."
-                    };
-                } catch (error) {
-                    console.error("VirusTotal error:", error);
-                    return null;
-                }
-            }
-
-            function extractDomain(url) {
-                try {
-                    const domain = new URL(url).hostname;
-                    return domain.startsWith('www.') ? domain.substring(4) : domain;
-                } catch {
-                    return null;
-                }
-            }
-            */
 
             function showResult(result) {
                 verdict.textContent = result.message;
